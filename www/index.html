@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1f18">
+<title>Chaico</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* ===== Mobile layout on top of the original desktop stylesheet ===== */
+  html, body { height: 100%; overscroll-behavior: none; overflow-x: hidden; }
+  #shell { display: flex; flex-direction: column-reverse; }
+
+  /* bottom tab bar */
+  #sidebar { width: 100% !important; flex-direction: row !important; align-items: center; padding: 4px 4px !important; overflow-x: auto; box-shadow: 0 -2px 10px rgba(0,0,0,.08); z-index: 20; }
+  #sidebar .logo { display: none !important; }
+  #sidebar .theme-toggle { display: none !important; }
+  #navSide { display: flex !important; flex-direction: row !important; gap: 2px; width: 100%; }
+  #navSide button { flex: 1; flex-direction: column !important; font-size: 10.5px !important; padding: 8px 2px !important; gap: 3px !important; min-height: 52px; }
+  #navSide button .ic { font-size: 21px; }
+
+  /* top bar: app title + quick toggles (theme / zoom-out) */
+  #topbar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  #topbar .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+  #topbar .brand .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+  #topbar .actions { display: flex; gap: 6px; }
+  #topbar .actions button { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: var(--card);
+    color: var(--text); font-size: 17px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  #topbar .actions button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  #main { padding-bottom: 90px !important; -webkit-overflow-scrolling: touch; overflow-x: hidden; }
+
+  /* bigger, thumb-friendly touch targets everywhere */
+  button.primary, button.warn, button.ghost { min-height: 42px; font-size: 13.5px; }
+  button.small { min-height: 34px; }
+  input, select { min-height: 42px; font-size: 14px; }
+  .item-tile { min-height: 78px; }
+  .cart-row .qty-ctl button { width: 30px; height: 30px; font-size: 15px; }
+
+  /* never let content run off the edge of the screen */
+  .row2, .row3 { grid-template-columns: 1fr !important; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+  .cart-row { flex-wrap: wrap; gap: 6px; }
+  .item-list-row { flex-wrap: wrap; }
+  .item-list-row > div:last-child { flex-wrap: wrap; }
+  .pagehead { flex-wrap: wrap; gap: 10px; }
+  .modal { width: calc(100vw - 32px); }
+
+  .item-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important; }
+
+  /* floating running-total badge while browsing items in POS */
+  .cart-float { position: sticky; top: 54px; z-index: 12; display: flex; align-items: center; gap: 6px;
+    align-self: flex-end; margin-left: auto; background: var(--accent); color: var(--accent-ink);
+    padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 14px; box-shadow: var(--shadow);
+    width: fit-content; cursor: pointer; }
+
+  /* "Zoom out / Desktop mode" — shrinks everything so far more fits on screen */
+  html.desktop-mode #main { zoom: 0.62; }
+  html.desktop-mode .item-grid { grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important; }
+</style>
+</head>
+<body>
+  <div id="shell">
+    <aside id="sidebar">
+      <div class="logo">
+        <div class="mark">C</div>
+        <div class="txt"><h1>Chaico</h1><span>Canteen Manager</span></div>
+      </div>
+      <nav class="side" id="navSide"></nav>
+      <div class="theme-toggle">
+        <span id="themeLabel">Light Mode</span>
+        <div class="switch" id="themeSwitch"><div class="knob"></div></div>
+      </div>
+    </aside>
+    <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+      <div id="topbar">
+        <div class="brand"><div class="mark">C</div> Chaico</div>
+        <div class="actions">
+          <button id="zoomToggleBtn" title="Zoom out / Desktop mode">🔍</button>
+          <button id="themeToggleBtn" title="Light / Dark mode">🌙</button>
+        </div>
+      </div>
+      <main id="main"></main>
+    </div>
+  </div>
+
+  <script src="vendor/sql-wasm.js"></script>
+  <script src="vendor/chart.umd.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Zoom-out / Desktop mode toggle — persisted so it's remembered next launch.
+    (function () {
+      function apply(on) {
+        document.documentElement.classList.toggle('desktop-mode', on);
+        const btn = document.getElementById('zoomToggleBtn');
+        if (btn) btn.classList.toggle('on', on);
+      }
+      window.addEventListener('DOMContentLoaded', async () => {
+        try {
+          await window.chaicoReady;
+          const saved = await window.api.getSetting('desktopMode', '0');
+          apply(saved === '1');
+          const theme = await window.api.getSetting('theme', 'light');
+          const themeBtnInit = document.getElementById('themeToggleBtn');
+          if (themeBtnInit) themeBtnInit.textContent = theme === 'dark' ? '☀️' : '🌙';
+        } catch (e) {}
+        const zoomBtn = document.getElementById('zoomToggleBtn');
+        if (zoomBtn) zoomBtn.onclick = async () => {
+          const on = !document.documentElement.classList.contains('desktop-mode');
+          apply(on);
+          try { await window.api.setSetting('desktopMode', on ? '1' : '0'); } catch (e) {}
+        };
+        const themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) themeBtn.onclick = () => {
+          const sw = document.getElementById('themeSwitch');
+          if (sw) sw.click(); // reuse the original app's theme-switch logic
+          themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙';
+        };
+      });
+    })();
+  </script>
+</body>
+</html>
