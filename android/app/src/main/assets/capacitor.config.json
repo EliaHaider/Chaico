@@ -1,9 +1,0 @@
-{
-	"appId": "com.chaico.canteen",
-	"appName": "Chaico",
-	"webDir": "www",
-	"backgroundColor": "#1b1f18",
-	"android": {
-		"allowMixedContent": false
-	}
-}
